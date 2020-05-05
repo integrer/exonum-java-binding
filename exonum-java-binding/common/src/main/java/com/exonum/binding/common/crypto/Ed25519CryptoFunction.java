@@ -23,6 +23,7 @@ import static com.exonum.binding.common.crypto.CryptoFunctions.Ed25519.SIGNATURE
 import static com.exonum.binding.common.crypto.CryptoUtils.hasLength;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.goterl.lazycode.lazysodium.LazySodium;
 import com.goterl.lazycode.lazysodium.LazySodiumJava;
 import com.goterl.lazycode.lazysodium.SodiumJava;
 import com.goterl.lazycode.lazysodium.utils.LibraryLoader;
@@ -30,9 +31,14 @@ import com.goterl.lazycode.lazysodium.utils.LibraryLoader;
 /**
  * A ED25519 public-key signature system crypto function.
  */
-final class Ed25519CryptoFunction implements CryptoFunction {
+final class Ed25519CryptoFunction extends AbstractEd25519CryptoFunction {
 
   private final LazySodiumJava lazySodium;
+
+  @Override
+  protected LazySodium getLazySodium() {
+    return lazySodium;
+  }
 
   /**
    * Creates a new Ed25519 crypto function that will attempt to load the sodium library
@@ -41,55 +47,6 @@ final class Ed25519CryptoFunction implements CryptoFunction {
    */
   Ed25519CryptoFunction(LibraryLoader.Mode mode) {
     lazySodium = new LazySodiumJava(new SodiumJava(mode));
-  }
-
-  @Override
-  public KeyPair generateKeyPair(byte[] seed) {
-    checkArgument(hasLength(seed, SEED_BYTES),
-        "Seed byte array has invalid size (%s), must be %s", seed.length, SEED_BYTES);
-
-    byte[] publicKey = new byte[PUBLIC_KEY_BYTES];
-    byte[] privateKey = new byte[PRIVATE_KEY_BYTES];
-
-    if (!lazySodium.cryptoSignSeedKeypair(publicKey, privateKey, seed)) {
-      throw new RuntimeException("Failed to generate a key pair");
-    }
-    return KeyPair.newInstanceNoCopy(privateKey, publicKey);
-  }
-
-  @Override
-  public KeyPair generateKeyPair() {
-    byte[] publicKey = new byte[PUBLIC_KEY_BYTES];
-    byte[] privateKey = new byte[PRIVATE_KEY_BYTES];
-
-    if (!lazySodium.cryptoSignKeypair(publicKey, privateKey)) {
-      throw new RuntimeException("Failed to generate a key pair");
-    }
-    return KeyPair.newInstanceNoCopy(privateKey, publicKey);
-  }
-
-  @Override
-  public byte[] signMessage(byte[] message, PrivateKey privateKey) {
-    checkArgument(hasLength(privateKey.toBytesNoCopy(), PRIVATE_KEY_BYTES));
-    byte[] signature = new byte[SIGNATURE_BYTES];
-    boolean signed = lazySodium.cryptoSignDetached(signature, message, message.length,
-        privateKey.toBytesNoCopy());
-
-    if (!signed) {
-      throw new RuntimeException("Could not sign the message.");
-    }
-    return signature;
-  }
-
-  @Override
-  public boolean verify(byte[] message, byte[] signature, PublicKey publicKey) {
-    checkArgument(hasLength(publicKey.toBytesNoCopy(), PUBLIC_KEY_BYTES),
-        "Public key has invalid size (%s), must be %s", publicKey.size(), PUBLIC_KEY_BYTES);
-    if (!hasLength(signature, SIGNATURE_BYTES)) {
-      return false;
-    }
-    return lazySodium
-        .cryptoSignVerifyDetached(signature, message, message.length, publicKey.toBytesNoCopy());
   }
 
 }
